@@ -9,6 +9,7 @@ module protocol::app {
   use sui::transfer;
   use sui::package;
   use sui::event;
+  use sui::package::Publisher;
   use x::ac_table::AcTableCap;
   use x::one_time_lock_value::OneTimeLockValue;
   use protocol::market::{Self, Market};
@@ -18,6 +19,7 @@ module protocol::app {
   use protocol::error;
   use protocol::reserve;
   use protocol::apm;
+  use protocol::obligation_key_display;
   use whitelist::whitelist;
   use protocol::obligation_access::ObligationAccessStore;
   use protocol::obligation_access;
@@ -56,19 +58,19 @@ module protocol::app {
   struct FreezeProtocolEvent has copy, drop {
     market: ID,
     sender: address,
-  }  
+  }
 
   const REASONABLE_MAX_DELAYS: u64 = 0; // this function is disabled for now, hence it set as 0
 
   fun init(otw: APP, ctx: &mut TxContext) {
     init_internal(otw, ctx)
   }
-  
+
   #[test_only]
   public fun init_t(ctx: &mut TxContext) {
     init_internal(APP {}, ctx)
   }
-  
+
   #[allow(lint(self_transfer, share_owned))]
   fun init_internal(otw: APP, ctx: &mut TxContext) {
     let (market, interest_model_cap, risk_model_cap) = market::new(ctx);
@@ -194,7 +196,7 @@ module protocol::app {
     let now = clock::timestamp_ms(clock) / 1000;
     market::register_coin<T>(market, now);
   }
-  
+
   public fun update_interest_model<T>(
     market: &mut Market,
     admin_cap: &AdminCap,
@@ -233,7 +235,7 @@ module protocol::app {
     );
     risk_model_change
   }
-  
+
   public entry fun add_risk_model<T>(
     market: &mut Market,
     admin_cap: &AdminCap,
@@ -243,7 +245,7 @@ module protocol::app {
     update_risk_model<T>(market, admin_cap, risk_model_change, ctx);
     market::register_collateral<T>(market);
   }
-  
+
   public entry fun update_risk_model<T>(
     market: &mut Market,
     admin_cap: &AdminCap,
@@ -575,7 +577,7 @@ module protocol::app {
 
     dynamic_field::remove_if_exists<MinCollateralAmountKey, u64>(market_uid_mut, key);
     dynamic_field::add(market_uid_mut, key, min_amount);
-  }  
+  }
 
   public entry fun update_borrow_limit<T: drop>(
     _admin_cap: &AdminCap,
@@ -587,7 +589,7 @@ module protocol::app {
 
     dynamic_field::remove_if_exists<BorrowLimitKey, u64>(market_uid_mut, key);
     dynamic_field::add(market_uid_mut, key, limit_amount);
-  }  
+  }
 
   public entry fun update_isolated_asset_status<PoolType: drop>(
     _admin_cap: &AdminCap,
@@ -599,7 +601,7 @@ module protocol::app {
 
     dynamic_field::remove_if_exists<IsolatedAssetKey, bool>(market_uid_mut, key);
     dynamic_field::add(market_uid_mut, key, is_isolated);
-  }  
+  }
 
   /// notice This is for admin to init the referral witness list
   /// dev Make sure only call this function once to have only 1 witness list
@@ -633,6 +635,14 @@ module protocol::app {
     ctx: &mut TxContext
   ) {
     market::init_market_coin_price_table(market, ctx);
+  }
+
+  public fun init_obligation_key_display(
+    _admin_cap: &AdminCap,
+    publisher: &Publisher,
+    ctx: &mut TxContext,
+  ) {
+    obligation_key_display::init_display(publisher, ctx);
   }
 
   /// For extension of the protocol

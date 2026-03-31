@@ -1,5 +1,5 @@
 module protocol::market {
-  
+
   use std::vector;
   use std::fixed_point32;
   use std::type_name::{TypeName, get, Self};
@@ -42,7 +42,7 @@ module protocol::market {
   friend protocol::flash_loan;
   friend protocol::accrue_interest;
   friend protocol::lock_obligation;
-  
+
   struct Market has key, store {
     id: UID,
     borrow_dynamics: WitTable<BorrowDynamics, TypeName, BorrowDynamic>,
@@ -69,7 +69,7 @@ module protocol::market {
   public fun risk_models(market: &Market): &AcTable<RiskModels, TypeName, RiskModel> { &market.risk_models }
   public fun reward_factors(market: &Market): &WitTable<RewardFactors, TypeName, RewardFactor> { &market.reward_factors }
   public fun collateral_stats(market: &Market): &WitTable<CollateralStats, TypeName, CollateralStat> { &market.collateral_stats }
-  
+
   public fun total_global_debt(market: &Market, pool_type: TypeName): u64 {
     let balance_sheet = wit_table::borrow(reserve::balance_sheets(&market.vault), pool_type);
     let (_, debt, _, _) = reserve::balance_sheet(balance_sheet);
@@ -109,8 +109,8 @@ module protocol::market {
     };
 
     *df::borrow<IsolatedAssetKey, bool>(&self.id, isolated_asset_key)
-  }  
-  
+  }
+
   public(friend) fun new(ctx: &mut TxContext)
   : (Market, AcTableCap<InterestModels>, AcTableCap<RiskModels>)
   {
@@ -123,7 +123,7 @@ module protocol::market {
       interest_models,
       risk_models,
       limiters: limiter::init_table(ctx),
-      // @NOTE: this feature is deprecated 
+      // @NOTE: this feature is deprecated
       reward_factors: incentive_rewards::init_table(ctx),
       asset_active_states: asset_active_state::new(ctx),
       vault: reserve::new(ctx),
@@ -191,11 +191,11 @@ module protocol::market {
   public(friend) fun set_flash_loan_fee<T>(self: &mut Market, fee: u64) {
     reserve::set_flash_loan_fee<T>(&mut self.vault, fee)
   }
-  
+
   public(friend) fun risk_models_mut(self: &mut Market): &mut AcTable<RiskModels, TypeName, RiskModel> {
     &mut self.risk_models
   }
-  
+
   public(friend) fun interest_models_mut(self: &mut Market): &mut AcTable<InterestModels, TypeName, InterestModel> {
     &mut self.interest_models
   }
@@ -207,7 +207,7 @@ module protocol::market {
   public(friend) fun reward_factors_mut(self: &mut Market): &mut WitTable<RewardFactors, TypeName, RewardFactor> {
     &mut self.reward_factors
   }
-  
+
   public(friend) fun handle_borrow<T>(
     self: &mut Market,
     borrow_amount: u64,
@@ -218,9 +218,9 @@ module protocol::market {
     update_interest_rates(self);
     borrowed_balance
   }
-  
+
   /// IMPORTANT: `accrue_all_interests` is not called here!
-  /// `accrue_all_interests` can be called independently so we can expect 
+  /// `accrue_all_interests` can be called independently so we can expect
   /// how much of the current debt after the interest accrued before repaying
   public(friend) fun handle_repay<T>(
     self: &mut Market,
@@ -232,7 +232,7 @@ module protocol::market {
     reserve::handle_repay(&mut self.vault, balance);
     update_interest_rates(self);
   }
-  
+
   public(friend) fun handle_add_collateral<T>(
     self: &mut Market,
     collateral_amount: u64
@@ -244,7 +244,7 @@ module protocol::market {
     let max_collateral_amount = risk_model::max_collateral_Amount(risk_model);
     assert!(total_collateral_amount <= max_collateral_amount, error::max_collateral_reached_error());
   }
-  
+
   public(friend) fun handle_withdraw_collateral<T>(
     self: &mut Market,
     amount: u64,
@@ -254,7 +254,7 @@ module protocol::market {
     collateral_stats::decrease(&mut self.collateral_stats, get<T>(), amount);
     update_interest_rates(self);
   }
-  
+
   public(friend) fun handle_liquidation<DebtType, CollateralType>(
     self: &mut Market,
     balance: Balance<DebtType>,
@@ -267,13 +267,27 @@ module protocol::market {
     update_interest_rates(self);
   }
 
+  public(friend) fun handle_liquidation_v2<DebtType, CollateralType>(
+    self: &mut Market,
+    repay_balance: Balance<DebtType>,
+    collateral_revenue: Balance<CollateralType>,
+    liquidate_amount: u64, // liquidate amount of the collateral
+  ) {
+    // Handle debt repayment (full repay amount goes to debt reduction)
+    reserve::handle_repay(&mut self.vault, repay_balance);
+    // Handle protocol revenue in collateral type
+    reserve::handle_revenue(&mut self.vault, collateral_revenue);
+    collateral_stats::decrease(&mut self.collateral_stats, get<CollateralType>(), liquidate_amount);
+    update_interest_rates(self);
+  }
+
   public(friend) fun init_market_coin_price_table(
     self: &mut Market,
     ctx: &mut TxContext,
   ) {
     reserve::init_market_coin_price_table(&mut self.vault, ctx);
   }
-  
+
   public(friend) fun handle_redeem<T>(
     self: &mut Market,
     market_coin_balance: Balance<MarketCoin<T>>,
@@ -284,7 +298,7 @@ module protocol::market {
     update_interest_rates(self);
     reddem_balance
   }
-  
+
   public(friend) fun handle_mint<T>(
     self: &mut Market,
     balance: Balance<T>,
@@ -374,7 +388,7 @@ module protocol::market {
       i = i + 1;
     };
   }
-  
+
   // accure interest for all markets
   fun update_interest_rates(
     self: &mut Market,

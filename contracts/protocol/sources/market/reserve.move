@@ -201,6 +201,17 @@ module protocol::reserve {
     balance_bag::join(&mut self.underlying_balances, revenue_balance);
   }
 
+  /// Handle protocol revenue in any coin type (e.g. collateral revenue from liquidation)
+  public(friend) fun handle_revenue<T>(
+    self: &mut Reserve,
+    revenue_balance: Balance<T>,
+  ) {
+    let balance_sheet = wit_table::borrow_mut(BalanceSheets{}, &mut self.balance_sheets, get<T>());
+    balance_sheet.cash = balance_sheet.cash + balance::value(&revenue_balance);
+    balance_sheet.revenue = balance_sheet.revenue + balance::value(&revenue_balance);
+    balance_bag::join(&mut self.underlying_balances, revenue_balance);
+  }
+
   public(friend) fun mint_market_coin<T>(
     self: &mut Reserve,
     underlying_balance: Balance<T>,
